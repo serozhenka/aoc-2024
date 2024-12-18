@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 )
 
@@ -76,21 +75,21 @@ func (q *queue[T]) Dequeue() (T, error) {
 	return first, nil
 }
 
-func dijkstra(adjecencyList [][]int) ([]int, map[int][]int) {
+func dijkstra(adjecencyMap map[int]map[int]int) ([]int, map[int]map[int]bool) {
 	visited := map[int]bool{}
-	parent := map[int][]int{}
+	parent := map[int]map[int]bool{}
 
-	distances := make([]int, len(adjecencyList))
+	distances := make([]int, len(adjecencyMap))
 	for i := range distances {
 		if i != 0 {
 			distances[i] = math.MaxInt
 		}
 	}
 
-	for range adjecencyList {
+	for range adjecencyMap {
 		idx := -1
 		minDistance := math.MaxInt
-		for i := range adjecencyList {
+		for i := 0; i < len(adjecencyMap); i++ {
 			if !visited[i] && distances[i] < minDistance {
 				minDistance = distances[i]
 				idx = i
@@ -99,18 +98,16 @@ func dijkstra(adjecencyList [][]int) ([]int, map[int][]int) {
 
 		visited[idx] = true
 
-		for aIdx := range adjecencyList {
-			if adjecencyList[idx][aIdx] != 0 && !visited[aIdx] {
-				distance := distances[idx] + adjecencyList[idx][aIdx]
+		for aIdx, d := range adjecencyMap[idx] {
+			if !visited[aIdx] {
+				distance := distances[idx] + d
 				if distance < distances[aIdx] {
 					distances[aIdx] = distance
-					parent[aIdx] = []int{idx}
+					parent[aIdx] = map[int]bool{idx: true}
 				}
 
-				if distance <= distances[aIdx] {
-					if !slices.Contains(parent[aIdx], idx) {
-						parent[aIdx] = append(parent[aIdx], idx)
-					}
+				if distance == distances[aIdx] {
+					parent[aIdx][idx] = true
 				}
 			}
 		}
@@ -187,9 +184,10 @@ func main() {
 		}
 	}
 
-	adjecencyList := make([][]int, len(allVertices))
+	// adjecencyList := make([][]int, len(allVertices))
+	adjecencyMap := map[int]map[int]int{}
 	for i := range allVertices {
-		adjecencyList[i] = make([]int, len(allVertices))
+		adjecencyMap[i] = map[int]int{}
 	}
 
 	for i, v1 := range allVertices {
@@ -200,22 +198,22 @@ func main() {
 
 			if v1.pos == v2.pos {
 				turns := turnsRequired(v1.direction, v2.direction)
-				adjecencyList[i][j] = turns * 1000
-				adjecencyList[j][i] = turns * 1000
+				adjecencyMap[i][j] = turns * 1000
+				adjecencyMap[j][i] = turns * 1000
 			} else if v1.direction == v2.direction {
 				diff1 := v1.pos.sub(v2.pos)
 				diff2 := v2.pos.sub(v1.pos)
 
 				if steps[v1.direction-1] == diff1 {
-					adjecencyList[j][i] = 1
+					adjecencyMap[j][i] = 1
 				} else if steps[v1.direction-1] == diff2 {
-					adjecencyList[i][j] = 1
+					adjecencyMap[i][j] = 1
 				}
 			}
 		}
 	}
 
-	distances, parent := dijkstra(adjecencyList)
+	distances, parent := dijkstra(adjecencyMap)
 
 	var traversePaths func(v int, path []int) [][]int
 	traversePaths = func(v int, path []int) [][]int {
@@ -227,7 +225,7 @@ func main() {
 			return paths
 		}
 
-		for _, p := range parent[v] {
+		for p := range parent[v] {
 			for _, newPath := range traversePaths(p, path) {
 				pCopy := make([]int, len(newPath))
 				copy(pCopy, newPath)
